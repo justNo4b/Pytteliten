@@ -1,8 +1,8 @@
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <sstream>
-#include <string>
 #include <vector>
 
 #ifndef MINIFIED
@@ -244,7 +244,7 @@ struct Board {
     }
 
     void generateFromGetter(auto *&moves, auto targets,
-                            auto (*getter)(uint32_t, uint64_t), auto pieces) const {
+                            auto(*getter)(uint32_t, uint64_t), auto pieces) const {
         while (pieces) {
             const auto from = __builtin_ctzll(pieces);
             pieces &= pieces - 1;
@@ -668,6 +668,8 @@ struct ThreadData {
 #endif
 
     bool searchComplete = true;
+
+    int32_t quietHistory[2][64][64] = {0};
 };
 
 int32_t negamax(auto &board, auto &threadData, auto ply, auto depth, auto alpha, auto beta, auto hardTimeLimit) {
@@ -696,7 +698,7 @@ int32_t negamax(auto &board, auto &threadData, auto ply, auto depth, auto alpha,
     // mvv-lva sorting
     pair<int32_t, uint16_t> scoredMoves[256];
     while (auto move = moves[i++])
-        scoredMoves[i] = {board.state.pieceOn(move >> 4 & 63) > 5 ? 0 : 9 + 9 * board.state.pieceOn(move >> 4 & 63) - board.state.pieceOn(move >> 10),
+        scoredMoves[i] = {board.state.pieceOn(move >> 4 & 63) > 5 ? threadData.quietHistory[board.state.flags[0]][move >> 10][move >> 4 & 63] : 9000 + 9 * board.state.pieceOn(move >> 4 & 63) - board.state.pieceOn(move >> 10),
                           move};
     stable_sort(scoredMoves, scoredMoves + i, greater());
 
@@ -726,8 +728,10 @@ int32_t negamax(auto &board, auto &threadData, auto ply, auto depth, auto alpha,
 
             if (score > alpha) {
                 alpha = score;
-                if (alpha >= beta)
+                if (alpha >= beta) {
+                    threadData.quietHistory[board.state.flags[0]][move >> 10][move >> 4 & 63] += depth * depth;
                     break;
+                }
             }
         }
     }
@@ -747,6 +751,7 @@ void searchRoot(auto &board, auto &threadData, auto timeRemaining, auto incremen
 ) {
     auto bestMove = 0;
     auto startTime = chrono::high_resolution_clock::now();
+    memset(threadData.quietHistory, 0, sizeof(threadData.quietHistory));
     for (auto depth = 1; depth <
 #ifndef MINIFIED
                          searchDepth +
