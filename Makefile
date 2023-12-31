@@ -18,7 +18,7 @@ ifeq ($(OS), Windows_NT)
     SUFFIX   := .exe
     CXXFLAGS += -static
 else
-	CXXFLAGS += -pthread -stdlib=libc++
+	CXXFLAGS += -pthread
 endif
 
 OUT := $(EXE)$(SUFFIX)
